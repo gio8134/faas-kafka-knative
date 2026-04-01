@@ -1,0 +1,70 @@
+
+sudo usermod -aG sudo gio81 
+newgrp sudo
+groups gio81
+
+### ------------- installa docker -------------------
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+sudo usermod -aG docker gio81
+newgrp sudo
+groups gio81
+
+### ------------- installa k3s -------------------
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl
+curl -sfL https://get.k3s.io | sh -
+sudo systemctl status k3s
+sudo mkdir -p /home/gio81/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml /home/gio81/.kube/config
+sudo chown gio81:gio81 /home/gio81/.kube/config
+export KUBECONFIG=/home/gio81/.kube/config
+
+sudo kubectl create namespace kafka
+sudo kubectl create -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka
+sudo kubectl -n kafka set env deployment/strimzi-cluster-operator STRIMZI_FEATURE_GATES=+UseStrimziPodSets,+UseKRaft
+
+sudo cat <<-EOF | sudo kubectl -n kafka apply -f -
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: my-cluster
+spec:
+  kafka:
+    version: 3.3.1
+    replicas: 1
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+    config:
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      default.replication.factor: 1
+      min.insync.replicas: 1
+      inter.broker.protocol.version: "3.3"
+    storage:
+      type: jbod
+      volumes:
+      - id: 0
+        type: persistent-claim
+        size: 100Gi
+        deleteClaim: false
+# With KRaft not relevant:
+  zookeeper:
+    replicas: 1
+    storage:
+      type: persistent-claim
+      size: 100Gi
+      deleteClaim: false
+EOF
