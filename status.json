@@ -1,0 +1,13 @@
+{
+    "status": {
+        "phase":"xxx",
+        "...":"...",
+        "additional-info": {
+            "task":"t2",
+            "component":"federation-operator",
+            "use-case":"sylva-on-bm",
+            "topic-class":"error",
+            "topic-message":"missing-value:<parameter>"
+        }
+    }
+}
